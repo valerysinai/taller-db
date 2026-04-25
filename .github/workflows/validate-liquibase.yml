@@ -1,0 +1,57 @@
+name: Validar Base de Datos con Liquibase
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-db:
+    runs-on: ubuntu-latest
+
+    # Levantamos PostgreSQL como servicio para probar los scripts
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: taller_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Java (Requerido por Liquibase)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Instalar Liquibase
+        run: |
+          wget https://github.com/liquibase/liquibase/releases/download/v4.25.0/liquibase-4.25.0.tar.gz
+          mkdir liquibase
+          tar -xzf liquibase-4.25.0.tar.gz -C liquibase
+          echo "${PWD}/liquibase" >> $GITHUB_PATH
+
+      - name: Prohibir archivos SQL directos
+        run: |
+          if find src/main/resources/db/changelog -name "*.sql" | grep -q .; then
+            echo "ERROR: ¡No uses scripts SQL directos! Usa formato XML de Liquibase."
+            exit 1
+          fi
+
+      - name: Validar sintaxis (Liquibase Validate)
+        run: liquibase --defaults-file=liquibase.properties validate
+
+      - name: Ejecutar migraciones (Liquibase Update)
+        run: liquibase --defaults-file=liquibase.properties update

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <changeSet id="3" author="taller">
+        <createTable tableName="pedido">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="fecha" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total" type="DECIMAL(10, 2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="estado" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="usuario_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <!-- Relación Clave Foránea con Usuario -->
+        <addForeignKeyConstraint baseTableName="pedido" 
+                                 baseColumnNames="usuario_id" 
+                                 constraintName="fk_pedido_usuario" 
+                                 referencedTableName="usuario" 
+                                 referencedColumnNames="id"/>
+    </changeSet>
+</databaseChangeLog>

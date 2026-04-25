@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <include file="src/main/resources/db/changelog/v1/001-create-usuario.xml" />
+    <include file="src/main/resources/db/changelog/v1/002-create-producto.xml" />
+    <include file="src/main/resources/db/changelog/v1/003-create-pedido.xml" />
+    <include file="src/main/resources/db/changelog/v2/001-add-indexes.xml" />
+
+</databaseChangeLog>
