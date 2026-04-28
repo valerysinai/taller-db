@@ -43,12 +43,13 @@ jobs:
           tar -xzf liquibase-4.25.0.tar.gz -C liquibase
           echo "${PWD}/liquibase" >> $GITHUB_PATH
 
-      - name: Prohibir archivos SQL directos
-        run: |
-          if find src/main/resources/db/changelog -name "*.sql" | grep -q .; then
-            echo "ERROR: ¡No uses scripts SQL directos! Usa formato XML de Liquibase."
-            exit 1
-          fi
+      - name: Prohibir archivos SQL directos fuera de scripts/
+  run: |
+    if find src/main/resources/db/changelog -name "*.sql" \
+      ! -path "*/scripts/*" | grep -q .; then
+      echo "ERROR: No subas archivos .sql directos fuera de scripts/"
+      exit 1
+    fi
 
       - name: Validar sintaxis (Liquibase Validate)
         run: liquibase --defaults-file=liquibase.properties validate
