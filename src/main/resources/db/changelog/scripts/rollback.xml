@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Changeset para crear una tabla con rollback automático -->
+    <!-- Liquibase sabe cómo deshacer un createTable automáticamente (haciendo dropTable) -->
+    <changeSet id="001-create-categoria" author="valery">
+        <createTable tableName="categoria">
+            <column name="id" type="int" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="nombre" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Changeset con un script SQL y rollback definido manualmente -->
+    <!-- Como es SQL crudo, Liquibase no sabe cómo deshacerlo, debemos especificar el rollback -->
+    <changeSet id="002-insert-categoria" author="valery">
+        <sql>
+            INSERT INTO categoria (nombre) VALUES ('Electrónica');
+            INSERT INTO categoria (nombre) VALUES ('Accesorios');
+        </sql>
+        <rollback>
+            <sql>
+                DELETE FROM categoria WHERE nombre IN ('Electrónica', 'Accesorios');
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
