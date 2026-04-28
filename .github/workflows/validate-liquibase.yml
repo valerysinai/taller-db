@@ -1,16 +1,12 @@
 name: Validar Base de Datos con Liquibase
-
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
 jobs:
   validate-db:
     runs-on: ubuntu-latest
-
-    # Levantamos PostgreSQL como servicio para probar los scripts
     services:
       postgres:
         image: postgres:15
@@ -25,34 +21,27 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
-      - name: Descargar el código
+      - name: Descargar el codigo
         uses: actions/checkout@v4
-
-      - name: Instalar Java (Requerido por Liquibase)
+      - name: Instalar Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
       - name: Instalar Liquibase
         run: |
           wget https://github.com/liquibase/liquibase/releases/download/v4.25.0/liquibase-4.25.0.tar.gz
           mkdir liquibase
           tar -xzf liquibase-4.25.0.tar.gz -C liquibase
           echo "${PWD}/liquibase" >> $GITHUB_PATH
-
-      - name: Prohibir archivos SQL directos fuera de scripts/
-  run: |
-    if find src/main/resources/db/changelog -name "*.sql" \
-      ! -path "*/scripts/*" | grep -q .; then
-      echo "ERROR: No subas archivos .sql directos fuera de scripts/"
-      exit 1
-    fi
-
-      - name: Validar sintaxis (Liquibase Validate)
+      - name: Prohibir SQL fuera de scripts
+        run: |
+          if find src/main/resources/db/changelog -name "*.sql" ! -path "*/scripts/*" | grep -q .; then
+            echo "ERROR: No subas .sql directos fuera de scripts/"
+            exit 1
+          fi
+      - name: Validar sintaxis
         run: liquibase --defaults-file=liquibase.properties validate
-
-      - name: Ejecutar migraciones (Liquibase Update)
+      - name: Ejecutar migraciones
         run: liquibase --defaults-file=liquibase.properties update
