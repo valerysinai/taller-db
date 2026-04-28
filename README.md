@@ -1,4 +1,4 @@
-# 🗄️ Base de Datos 
+# Base de Datos — Taller Fullstack
 
 Repositorio de base de datos gestionado con **Liquibase** y **PostgreSQL**.  
 Aquí **no se escribe SQL directamente** — todo cambio en la BD se hace mediante archivos XML llamados *changesets*.
@@ -11,7 +11,10 @@ Aquí **no se escribe SQL directamente** — todo cambio en la BD se hace median
 db-repo/
 ├── .github/
 │   └── workflows/
-│       └── validate-liquibase.yml        # Robot que valida que nadie suba SQL directo
+│       └── validate-liquibase.yml        # Robot que valida las migraciones en cada push
+├── Docker/
+│   └── liquibase/
+│       └── Dockerfile                    # Imagen Docker personalizada de Liquibase
 ├── src/
 │   └── main/
 │       └── resources/
@@ -22,23 +25,30 @@ db-repo/
 │                   │   ├── 001-create-usuario.xml
 │                   │   ├── 002-create-producto.xml
 │                   │   └── 003-create-pedido.xml
-│                   └── v2/               # Versión 2: optimizaciones (índices)
-│                       └── 001-add-indexes.xml
+│                   ├── v2/               # Versión 2: optimizaciones (índices)
+│                   │   └── 001-add-indexes.xml
+│                   └── scripts/          # Scripts SQL de referencia
+│                       ├── ddl.sql       # Data Definition Language (crear/modificar tablas)
+│                       ├── dml.sql       # Data Manipulation Language (insertar/actualizar datos)
+│                       ├── dcl.sql       # Data Control Language (permisos y usuarios)
+│                       └── rollback.xml  # Ejemplos de reversión de cambios
+├── docker-compose.yml                    # Levanta PostgreSQL + Liquibase juntos
 ├── liquibase.properties                  # Configuración de conexión a PostgreSQL
 └── README.md
 ```
 
 ---
 
-## 🧠 ¿Cómo funciona? (Explicado simple)
+## ¿Cómo funciona? (Explicado simple)
 
 Imagina que la base de datos es un **edificio en construcción**:
 
 ```
-Liquibase = El arquitecto
-Archivos XML = Los planos del edificio
-PostgreSQL = El terreno donde se construye
-master.xml = El índice que dice en qué orden seguir los planos
+Liquibase     = El arquitecto
+Archivos XML  = Los planos del edificio
+PostgreSQL    = El terreno donde se construye
+master.xml    = El índice que dice en qué orden seguir los planos
+scripts/      = La biblioteca de referencia (consulta, no construcción)
 ```
 
 Tú **nunca construyes la pared directamente** (nunca escribes SQL en la BD).  
@@ -46,7 +56,7 @@ En cambio, le entregas el plano (el XML) al arquitecto (Liquibase) y él constru
 
 ---
 
-## 🔑 Archivos más importantes
+## Archivos más importantes
 
 ### 1. `master.xml` — El índice principal
 
@@ -73,37 +83,26 @@ Es el punto de entrada de Liquibase. Define en qué orden deben ejecutarse los d
 ### 2. `v1/001-create-usuario.xml` — Crea la tabla Usuario
 
 ```xml
-<changeSet id="1" author="taller">   <!-- id único + quién hizo el cambio -->
+<changeSet id="1" author="taller">
     <createTable tableName="usuario">
-
         <column name="id" type="BIGINT" autoIncrement="true">
             <constraints primaryKey="true" nullable="false"/>
-            <!-- primaryKey = es la llave principal, autoIncrement = se genera solo: 1, 2, 3... -->
         </column>
-
         <column name="nombre" type="VARCHAR(255)">
-            <constraints nullable="false"/>   <!-- obligatorio, no puede estar vacío -->
+            <constraints nullable="false"/>
         </column>
-
         <column name="email" type="VARCHAR(255)">
             <constraints nullable="false" unique="true"/>
-            <!-- unique = no pueden existir dos usuarios con el mismo email -->
         </column>
-
         <column name="password" type="VARCHAR(255)">
             <constraints nullable="false"/>
         </column>
-
         <column name="fecha_creacion" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
-            <!-- CURRENT_TIMESTAMP = pone automáticamente la fecha y hora actual al crear -->
             <constraints nullable="false"/>
         </column>
-
     </createTable>
 </changeSet>
 ```
-
-**Resultado en PostgreSQL:**
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
@@ -120,33 +119,22 @@ Es el punto de entrada de Liquibase. Define en qué orden deben ejecutarse los d
 ```xml
 <changeSet id="2" author="taller">
     <createTable tableName="producto">
-
         <column name="id" type="BIGINT" autoIncrement="true">
             <constraints primaryKey="true" nullable="false"/>
         </column>
-
         <column name="nombre" type="VARCHAR(255)">
             <constraints nullable="false"/>
         </column>
-
         <column name="descripcion" type="TEXT"/>
-        <!-- TEXT = texto largo sin límite de caracteres -->
-
         <column name="precio" type="DECIMAL(10, 2)">
-            <!-- DECIMAL(10,2) = número con hasta 10 dígitos y 2 decimales, ej: 99999999.99 -->
             <constraints nullable="false"/>
         </column>
-
         <column name="stock" type="INT" defaultValue="0">
-            <!-- defaultValue="0" = si no se especifica, el stock empieza en 0 -->
             <constraints nullable="false"/>
         </column>
-
     </createTable>
 </changeSet>
 ```
-
-**Resultado en PostgreSQL:**
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
@@ -160,53 +148,35 @@ Es el punto de entrada de Liquibase. Define en qué orden deben ejecutarse los d
 
 ### 4. `v1/003-create-pedido.xml` — Crea la tabla Pedido + Llave Foránea
 
-Este es el más importante porque tiene una **relación con la tabla Usuario**:
-
 ```xml
 <changeSet id="3" author="taller">
     <createTable tableName="pedido">
-
         <column name="id" type="BIGINT" autoIncrement="true">
             <constraints primaryKey="true" nullable="false"/>
         </column>
-
         <column name="fecha" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
             <constraints nullable="false"/>
         </column>
-
         <column name="total" type="DECIMAL(10, 2)">
             <constraints nullable="false"/>
         </column>
-
         <column name="estado" type="VARCHAR(50)">
-            <!-- Valores posibles: PENDIENTE, PAGADO, ENVIADO, ENTREGADO -->
             <constraints nullable="false"/>
+            <!-- Valores: PENDIENTE, PAGADO, ENVIADO, ENTREGADO -->
         </column>
-
         <column name="usuario_id" type="BIGINT">
-            <!-- Esta columna conecta el pedido con un usuario específico -->
             <constraints nullable="false"/>
         </column>
-
     </createTable>
 
-    <!-- 🔗 Llave Foránea: conecta pedido con usuario -->
     <addForeignKeyConstraint
         baseTableName="pedido"
         baseColumnNames="usuario_id"
         constraintName="fk_pedido_usuario"
         referencedTableName="usuario"
         referencedColumnNames="id"/>
-    <!--
-        Esto dice: el usuario_id de la tabla pedido
-        DEBE existir en la columna id de la tabla usuario.
-        Evita pedidos "huérfanos" (sin usuario válido).
-    -->
-
 </changeSet>
 ```
-
-> **¿Qué es una llave foránea?** Es una regla de integridad. Si el usuario con id=5 no existe, no puedes crear un pedido con usuario_id=5. Esto protege los datos de inconsistencias.
 
 **Relación entre tablas:**
 
@@ -225,7 +195,7 @@ Este es el más importante porque tiene una **relación con la tabla Usuario**:
 
 ---
 
-### 5. `v2/001-add-indexes.xml` — Agrega índices para búsquedas rápidas
+### 5. `v2/001-add-indexes.xml` — Índices para búsquedas rápidas
 
 ```xml
 <changeSet id="4" author="taller">
@@ -234,12 +204,170 @@ Este es el más importante porque tiene una **relación con la tabla Usuario**:
     </createIndex>
     <!--
         Un índice es como el índice de un libro:
-        Sin él, para buscar todos los pedidos del usuario 5,
-        PostgreSQL revisa TODA la tabla fila por fila.
-        Con el índice, va directo a los pedidos de ese usuario.
-        Resultado: búsquedas hasta 100x más rápidas.
+        Sin él PostgreSQL revisa TODA la tabla fila por fila.
+        Con el índice va directo → búsquedas hasta 100x más rápidas.
     -->
 </changeSet>
+```
+
+---
+
+## 📂 Scripts de Referencia (`scripts/`)
+
+Estos archivos son de **referencia y estudio**. No los ejecuta Liquibase automáticamente.
+
+---
+
+### 📄 `ddl.sql` — Data Definition Language
+
+> **¿Qué es DDL?** Son los comandos que **definen la estructura** de la base de datos. No mueven datos, solo crean, modifican o eliminan tablas y columnas.
+
+```sql
+-- ✅ CREATE: Crear una tabla desde cero
+CREATE TABLE usuario (
+    id            BIGSERIAL PRIMARY KEY,         -- BIGSERIAL = autoincremental
+    nombre        VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL UNIQUE,  -- UNIQUE = no se repite
+    password      VARCHAR(255) NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ✅ ALTER: Agregar una columna nueva a una tabla existente
+ALTER TABLE usuario ADD COLUMN telefono VARCHAR(20);
+
+-- ✅ DROP: Eliminar una tabla completamente (¡cuidado, borra todo!)
+-- DROP TABLE usuario;   ← comentado para evitar accidentes
+```
+
+| Comando | ¿Qué hace? |
+|---------|-----------|
+| `CREATE TABLE` | Crea una tabla nueva |
+| `ALTER TABLE` | Modifica una tabla existente |
+| `DROP TABLE` | Elimina una tabla y todos sus datos |
+
+---
+
+### 📄 `dml.sql` — Data Manipulation Language
+
+> **¿Qué es DML?** Son los comandos que **manipulan los datos** dentro de las tablas. Insertar, actualizar, eliminar y consultar.
+
+```sql
+-- ✅ INSERT: Insertar datos de prueba
+INSERT INTO usuario (nombre, email, password) VALUES
+    ('Valery García',  'valery@email.com',   '123456'),
+    ('Carlos López',   'carlos@email.com',   'abcdef'),
+    ('Ana Martínez',   'ana@email.com',       'pass123'),
+    ('Pedro Gómez',    'pedro@email.com',     'qwerty'),
+    ('Laura Torres',   'laura@email.com',     'laura99');
+
+INSERT INTO producto (nombre, descripcion, precio, stock) VALUES
+    ('Laptop Gaming',    'Alto rendimiento',   2500000, 10),
+    ('Mouse Inalámbrico','Ergonómico',           45000,  50),
+    ('Teclado Mecánico', 'Switches azules',     180000,  30),
+    ('Monitor 27"',      '4K HDR',              950000,   8),
+    ('Audífonos BT',     'Cancelación de ruido',220000,  25);
+
+INSERT INTO pedido (total, estado, usuario_id) VALUES
+    (2500000, 'PENDIENTE',  1),
+    (225000,  'PAGADO',     2),
+    (1130000, 'ENVIADO',    1),
+    (45000,   'ENTREGADO',  3),
+    (400000,  'PENDIENTE',  4);
+
+-- ✅ UPDATE: Actualizar un dato existente
+UPDATE producto SET stock = stock - 1 WHERE id = 1;
+
+-- ✅ DELETE: Eliminar un registro
+DELETE FROM pedido WHERE estado = 'ENTREGADO';
+
+-- ✅ SELECT con JOIN: Consultar pedidos con nombre del usuario
+SELECT
+    p.id          AS pedido_id,
+    u.nombre      AS cliente,
+    p.total,
+    p.estado,
+    p.fecha
+FROM pedido p
+INNER JOIN usuario u ON p.usuario_id = u.id
+ORDER BY p.fecha DESC;
+```
+
+| Comando | ¿Qué hace? |
+|---------|-----------|
+| `INSERT` | Agrega filas nuevas |
+| `UPDATE` | Modifica filas existentes |
+| `DELETE` | Elimina filas |
+| `SELECT` | Consulta y muestra datos |
+
+---
+
+### 📄 `dcl.sql` — Data Control Language
+
+> **¿Qué es DCL?** Son los comandos que **controlan los permisos** de acceso a la base de datos. Quién puede leer, escribir o modificar.
+
+```sql
+-- ✅ Crear un usuario de solo lectura (para reportes)
+CREATE USER lector_taller WITH PASSWORD 'lector123';
+
+-- ✅ GRANT: Dar permisos de lectura sobre todas las tablas
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO lector_taller;
+-- SELECT = solo puede consultar, no puede modificar nada
+
+-- ✅ Crear un usuario con permisos completos (para la app)
+CREATE USER app_taller WITH PASSWORD 'app123';
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_taller;
+-- Puede hacer todo: leer, crear, editar y eliminar
+
+-- ✅ REVOKE: Quitarle permisos a un usuario
+REVOKE DELETE ON ALL TABLES IN SCHEMA public FROM app_taller;
+-- Ya no puede eliminar registros
+```
+
+| Comando | ¿Qué hace? |
+|---------|-----------|
+| `CREATE USER` | Crea un nuevo usuario en PostgreSQL |
+| `GRANT` | Da permisos a un usuario |
+| `REVOKE` | Quita permisos a un usuario |
+
+---
+
+### 📄 `rollback.xml` — Revertir cambios con Liquibase
+
+> **¿Qué es Rollback?** Es la capacidad de **deshacer un cambio** aplicado a la base de datos. Como un Ctrl+Z para la BD.
+
+```xml
+<!-- Changeset con rollback definido -->
+<changeSet id="5" author="taller">
+
+    <!-- Acción: crear tabla de categorías -->
+    <createTable tableName="categoria">
+        <column name="id" type="BIGINT" autoIncrement="true">
+            <constraints primaryKey="true" nullable="false"/>
+        </column>
+        <column name="nombre" type="VARCHAR(100)">
+            <constraints nullable="false"/>
+        </column>
+    </createTable>
+
+    <!-- Rollback: si se deshace este changeset, elimina la tabla -->
+    <rollback>
+        <dropTable tableName="categoria"/>
+    </rollback>
+
+</changeSet>
+```
+
+**¿Cómo ejecutar el rollback?**
+
+```bash
+# Revertir el último changeset aplicado
+liquibase rollbackCount 1
+
+# Revertir hasta una fecha específica
+liquibase rollbackToDate 2026-04-01
+
+# Revertir hasta un tag específico
+liquibase rollback v1.0
 ```
 
 ---
@@ -261,41 +389,60 @@ changeLogFile=src/main/resources/db/changelog/master.xml
 driver=org.postgresql.Driver
 ```
 
-> **⚠️ Nota:** Si tienes PostgreSQL instalado localmente y hay conflicto en el puerto 5432, cambia el puerto a `5433` (el del contenedor Docker).
+> **⚠️ Nota:** Si tienes PostgreSQL instalado localmente y hay conflicto en el puerto `5432`, usa el puerto `5433` del contenedor Docker.
 
 ---
 
-### 7. `validate-liquibase.yml` — El robot protector (GitHub Action)
+### 7. `docker-compose.yml` — Levanta todo con un solo comando
 
-Se ejecuta automáticamente en cada `push` o `pull request` a `main`. Hace 5 cosas:
+Levanta PostgreSQL y Liquibase automáticamente:
+
+```yaml
+services:
+  postgres:                          # Servicio de base de datos
+    image: postgres:15-alpine
+    container_name: taller_postgres
+    ports:
+      - "5432:5432"                  # Puerto local:puerto contenedor
+    environment:
+      POSTGRES_DB: taller_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:                     # Verifica que PostgreSQL esté listo antes de continuar
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taller_db"]
+
+  liquibase:                         # Servicio que aplica las migraciones
+    build:
+      dockerfile: Docker/liquibase/Dockerfile
+    container_name: taller_liquibase
+    depends_on:
+      postgres:
+        condition: service_healthy   # Espera que postgres esté sano antes de correr
+    environment:
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: master.xml
+    command: update                  # Ejecuta las migraciones y se apaga (es normal ✅)
+```
+
+> **¿Por qué Liquibase se apaga solo?** Porque no es un servidor, es una tarea. Arranca, aplica los cambios y termina. El que debe seguir corriendo siempre es `taller_postgres`.
+
+---
+
+### 8. `validate-liquibase.yml` — El robot protector (GitHub Action)
 
 ```yaml
 steps:
-  # 1. Descarga el código del repositorio
   - name: Descargar el código
     uses: actions/checkout@v4
 
-  # 2. Instala Java (Liquibase lo necesita para correr)
   - name: Instalar Java
     uses: actions/setup-java@v4
 
-  # 3. Instala Liquibase
   - name: Instalar Liquibase
 
-  # 4. ❌ FALLA si alguien sube un archivo .sql directo
-  - name: Prohibir archivos SQL directos
-    run: |
-      if find src/main/resources/db/changelog -name "*.sql" | grep -q .; then
-        echo "ERROR: ¡No uses scripts SQL directos! Usa formato XML de Liquibase."
-        exit 1   # exit 1 = hace fallar el pipeline con ❌ rojo
-      fi
-
-  # 5. Verifica que los XML están bien escritos
-  - name: Validar sintaxis
+  - name: Validar sintaxis de los XML
     run: liquibase validate
 
-  # 6. Aplica los cambios en una BD temporal de prueba
-  - name: Ejecutar migraciones
+  - name: Ejecutar migraciones en BD temporal
     run: liquibase update
 ```
 
@@ -303,25 +450,28 @@ steps:
 
 ## ▶️ Cómo correr el proyecto
 
-### Requisitos previos
-- Docker instalado
-- Liquibase instalado
-
-### Pasos
+### Opción A — Con Docker Compose (recomendado)
 
 ```bash
-# 1. Levantar PostgreSQL con Docker
-docker run --name pg-taller \
+# 1. Levantar PostgreSQL y aplicar migraciones
+docker-compose up --build
+
+# 2. Verificar las tablas
+docker exec -it taller_postgres psql -U postgres -d taller_db -c "\dt"
+```
+
+### Opción B — Manual (si hay conflicto de puertos)
+
+```bash
+# 1. Levantar PostgreSQL en puerto 5433
+docker run --name taller_postgres \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=taller_db \
   -p 5433:5432 \
   -d postgres:15
 
-# 2. Esperar que inicie
-# (verifica con: docker exec pg-taller pg_isready -U postgres)
-
-# 3. Aplicar las migraciones
+# 2. Aplicar migraciones con Liquibase local
 liquibase \
   --url=jdbc:postgresql://localhost:5433/taller_db \
   --username=postgres \
@@ -329,35 +479,35 @@ liquibase \
   --changelog-file=src/main/resources/db/changelog/master.xml \
   update
 
-# 4. Verificar que las tablas fueron creadas
-docker exec -it pg-taller psql -U postgres -d taller_db -c "\dt"
+# 3. Verificar tablas
+docker exec -it taller_postgres psql -U postgres -d taller_db -c "\dt"
 ```
 
 ### Resultado esperado
 
 ```
-          List of relations
- Schema |   Name    | Type  |  Owner
---------+-----------+-------+----------
- public | pedido    | table | postgres
- public | producto  | table | postgres
- public | usuario   | table | postgres
+ Schema |          Name          | Type  |  Owner
+--------+------------------------+-------+----------
  public | databasechangelog      | table | postgres
  public | databasechangeloglock  | table | postgres
+ public | pedido                 | table | postgres
+ public | producto               | table | postgres
+ public | usuario                | table | postgres
 ```
 
-> Las tablas `databasechangelog` y `databasechangeloglock` son creadas automáticamente por Liquibase para llevar el registro de qué migraciones ya se ejecutaron. Son normales ✅
+> `databasechangelog` y `databasechangeloglock` son tablas que crea Liquibase automáticamente para llevar el registro de migraciones. Son normales ✅
 
 ---
 
-## 🛡️ Regla de oro de este repositorio
+## 🐘 Conectar a pgAdmin
 
 ```
-❌ PROHIBIDO → subir archivos .sql directos
-✅ PERMITIDO → solo archivos .xml de Liquibase
+Host:      localhost
+Puerto:    5433
+Base de datos: taller_db
+Usuario:   postgres
+Password:  postgres
 ```
-
-Si alguien intenta subir un `.sql`, el GitHub Action falla automáticamente con ❌ y no permite hacer merge.
 
 ---
 
