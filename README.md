@@ -1,11 +1,11 @@
-# 🗄️ Base de Datos — Taller Fullstack
+# 🗄️ Base de Datos 
 
 Repositorio de base de datos gestionado con **Liquibase** y **PostgreSQL**.  
 Aquí **no se escribe SQL directamente** — todo cambio en la BD se hace mediante archivos XML llamados *changesets*.
 
 ---
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 db-repo/
